@@ -1,98 +1,101 @@
-# ChatGPT Micro-Cap Experiment
-Welcome to the repo behind my 6-month live trading experiment where ChatGPT manages a real-money micro-cap portfolio.
+# Telegram Car Tuning MVP (Production-Ready Baseline)
 
-## Overview on getting started: [Here](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/blob/main/Start%20Your%20Own/README.md)
-   
-## Repository Structure
+## 1) Stack choice
+This MVP uses **Node.js + TypeScript** for all services because it provides a single typed runtime across bot, API, and worker; straightforward async queue handling with BullMQ/Redis; and a mature ecosystem for Telegram bots, S3, and image processing (Sharp). This keeps implementation coherent while still allowing provider-swapping and quick local iteration.
 
-- **`trading_script.py`** - Main trading engine with portfolio management and stop-loss automation
-- **`Scripts and CSV Files/`** - My personal portfolio (updates every trading day)
-- **`Start Your Own/`** - Template files and guide for starting your own experiment  
-- **`Weekly Deep Research (MD|PDF)/`** - Research summaries and performance reports
-- **`Experiment Details/`** - Documentation, methodology, prompts, and Q&A
+## Architecture
+- `apps/api` – REST API, credits/idempotency checks, job enqueue, metrics.
+- `apps/bot` – Telegram bot UX (`/start`, pack selection, generate/refine flow, manual top-up stub).
+- `apps/worker` – queue consumer, masking hook, image generation provider, watermark + collage output.
+- `packages/shared` – typed domain models + preset/prompt builder + business rules + tests.
+- `packages/image` – `ImageProvider` interface + `MockProvider` + `RealProvider` client + collage/watermark.
+- `packages/db` – SQL migrations and PG client.
 
-# The Concept
-Every day, I kept seeing the same ad about having some A.I. pick undervalued stocks. It was obvious it was trying to get me to subscribe to some garbage, so I just rolled my eyes.  
-Then I started wondering, "How well would that actually work?"
+## Features implemented
+- Free trial: first generated set is watermark-enabled.
+- Credits ledger + purchase records (`manual top-up stub`, swappable with Telegram Payments).
+- Idempotency key support on job submit + credit charging once.
+- Queue states: `queued -> processing -> succeeded/failed`.
+- Retry policy for worker jobs (BullMQ attempts/backoff).
+- Basic abuse protections:
+  - max concurrent jobs per user
+  - API payload validation
+- S3-compatible object storage (MinIO locally).
+- Metrics endpoint: `/metrics`.
 
-So, starting with just $100, I wanted to answer a simple but powerful question:
+## Environment
+Copy `.env.example` to `.env` and set secrets:
 
-**Can powerful large language models like ChatGPT actually generate alpha (or at least make smart trading decisions) using real-time data?**
+```bash
+cp .env.example .env
+```
 
-## Each trading day:
+Key vars:
+- `TELEGRAM_BOT_TOKEN`
+- `IMAGE_PROVIDER=mock|real`
+- `REAL_PROVIDER_URL`, `REAL_PROVIDER_API_KEY` (when using `real`)
+- `DATABASE_URL`, `REDIS_URL`, `S3_*`
 
-- I provide it trading data on the stocks in its portfolio.  
-- Strict stop-loss rules apply.  
-- Every week I allow it to use deep research to reevaluate its account.  
-- I track and publish performance data weekly on my blog: [Here](https://nathanbsmith729.substack.com)
+## Run locally
+```bash
+npm install
+npm run migrate
+docker compose up --build
+```
 
-## Research & Documentation
+Or with Make:
+```bash
+make up
+```
 
-- [Research Index](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/blob/main/Experiment%20Details/Deep%20Research%20Index.md)  
-- [Disclaimer](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/blob/main/Experiment%20Details/Disclaimer.md)  
-- [Q&A](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/blob/main/Experiment%20Details/Q%26A.md)  
-- [Prompts](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/blob/main/Experiment%20Details/Prompts.md)  
-- [Starting Your Own](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/blob/main/Start%20Your%20Own/README.md)  
-- [Research Summaries (MD)](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/tree/main/Weekly%20Deep%20Research%20(MD))  
-- [Full Deep Research Reports (PDF)](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/tree/main/Weekly%20Deep%20Research%20(PDF))
-- [Chats](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/blob/main/Experiment%20Details/Chats.md)
-# Current Performance
+## Tests
+```bash
+npm test
+```
 
-<!-- To update performance chart: 
-     1. Replace the image file with updated results
-     2. Update the dates and description below
-     3. Update the "Last Updated" date -->
+## API endpoints
+- `GET /health`
+- `GET /metrics`
+- `GET /users/:telegramId/credits`
+- `POST /users/:telegramId/topup` body: `{ "sku": "sku_1|sku_5|sku_20" }`
+- `POST /jobs` submit generation
+- `GET /jobs/:id`
 
-**Last Updated:** August 29th, 2025
+### Submit job example
+```json
+{
+  "telegramId": 123456,
+  "packType": "wrap",
+  "params": { "preset": "nardo gray", "finish": "matte" },
+  "sourceImageKey": "telegram/123/a.jpg",
+  "idempotencyKey": "telegram-update-1234",
+  "variants": 6,
+  "hd": false
+}
+```
 
-![Latest Performance Results](Results.png)
+## Telegram UX flow (MVP)
+1. `/start` -> welcome + CTA buttons.
+2. user uploads photo.
+3. bot shows pack buttons (Wrap / Wheels / Stance / Lights-Tint).
+4. generate 6 variants -> queued async.
+5. on completion: sends variants + collage + follow-up actions.
+6. refine: user sends text instruction; next generate includes refine note.
 
-**Current Status:** Portfolio is outperforming the S&P 500 benchmark
+## Presets supported
+- Wrap colors: 8 (`black`, `white`, `red`, `nardo gray`, `blue`, `green`, `silver`, `purple`)
+- Wheel styles: 6 (`mesh`, `multi-spoke`, `deep-dish`, `aero`, `split-five`, `motorsport`)
+- Stance levels: `-10`, `-20`, `-30` mm
+- Tint levels: `20`, `35`, `50` %
 
-*Performance data is updated after each trading day. See the CSV files in `Scripts and CSV Files/` for detailed daily tracking.*
+## Deploy outline
+1. Build each app image (api/worker/bot).
+2. Run managed Postgres + Redis + S3-compatible object storage.
+3. Run migrations (`npm run migrate`) during release.
+4. Set `IMAGE_PROVIDER=real` and provider credentials.
+5. Configure Telegram webhook/polling strategy (polling in MVP).
 
-# Features of This Repo
-- Live trading scripts — used to evaluate prices and update holdings daily  
-- LLM-powered decision engine — ChatGPT picks the trades  
-- Performance tracking — CSVs with daily PnL, total equity, and trade history  
-- Visualization tools — Matplotlib graphs comparing ChatGPT vs. Index  
-- Logs & trade data — auto-saved logs for transparency  
-
-# Why This Matters
-AI is being hyped across every industry, but can it really manage money without guidance?
-
-This project is an attempt to find out — with transparency, data, and a real budget.
-
-# Tech Stack & Features
-
-## Core Technologies
-- **Python** - Core scripting and automation
-- **pandas + yFinance** - Market data fetching and analysis
-- **Matplotlib** - Performance visualization and charting
-- **ChatGPT-4** - AI-powered trading decision engine
-
-## Key Features
-- **Robust Data Sources** - Yahoo Finance primary, Stooq fallback for reliability
-- **Automated Stop-Loss** - Automatic position management with configurable stop-losses
-- **Interactive Trading** - Market-on-Open (MOO) and limit order support
-- **Backtesting Support** - ASOF_DATE override for historical analysis
-- **Performance Analytics** - CAPM analysis, Sharpe/Sortino ratios, drawdown metrics
-- **Trade Logging** - Complete transparency with detailed execution logs
-
-## System Requirements
-- Python 3.7+
-- Internet connection for market data
-- ~10MB storage for CSV data files
-
-# Follow Along
-The experiment runs from June 2025 to December 2025.  
-Every trading day I will update the portfolio CSV file.  
-If you feel inspired to do something similar, feel free to use this as a blueprint.
-
-Updates are posted weekly on my blog, more coming soon!
-
-Blog: [A.I Controls Stock Account](https://nathanbsmith729.substack.com)
-
-Have feature requests or any advice?  
-
-Please reach out here: **nathanbsmith.business@gmail.com**
+## Notes / assumptions
+- Telegram Payments integration is stubbed through `/topup` manual credit grant and isolated for easy swap.
+- Rate limiting and concurrency checks are baseline and can be extended with Redis token-bucket middleware.
+- Masking interface is included (`SegmentationModule`) with a stub implementation for MVP.

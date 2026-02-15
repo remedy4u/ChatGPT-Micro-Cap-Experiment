@@ -1,0 +1,25 @@
+{
+  "name": "@mvp/worker",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "echo 'no worker tests'",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.714.0",
+    "@mvp/db": "0.1.0",
+    "@mvp/image": "0.1.0",
+    "@mvp/shared": "0.1.0",
+    "bullmq": "^5.34.4",
+    "dotenv": "^16.4.7",
+    "ioredis": "^5.4.2",
+    "pino": "^9.5.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}

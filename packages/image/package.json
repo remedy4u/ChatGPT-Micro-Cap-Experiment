@@ -1,0 +1,16 @@
+{
+  "name": "@mvp/image",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "echo 'no image tests'",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@mvp/shared": "0.1.0",
+    "sharp": "^0.33.5"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@mvp/api",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "echo 'no api tests'",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.714.0",
+    "@mvp/db": "0.1.0",
+    "@mvp/shared": "0.1.0",
+    "bullmq": "^5.34.4",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "ioredis": "^5.4.2",
+    "pino": "^9.5.0",
+    "prom-client": "^15.1.3",
+    "uuid": "^11.0.3",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "@types/express": "^5.0.0"
+  }
+}
