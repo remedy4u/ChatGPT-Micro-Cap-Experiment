@@ -1,98 +1,48 @@
-# ChatGPT Micro-Cap Experiment
-Welcome to the repo behind my 6-month live trading experiment where ChatGPT manages a real-money micro-cap portfolio.
+# RepairAI Guard (MVP)
 
-## Overview on getting started: [Here](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/blob/main/Start%20Your%20Own/README.md)
-   
-## Repository Structure
+Production-ready oriented MVP for appliance-repair companies. Focus: missed-call recovery, fast qualification, preliminary quotes, booking, reminders, and analytics.
 
-- **`trading_script.py`** - Main trading engine with portfolio management and stop-loss automation
-- **`Scripts and CSV Files/`** - My personal portfolio (updates every trading day)
-- **`Start Your Own/`** - Template files and guide for starting your own experiment  
-- **`Weekly Deep Research (MD|PDF)/`** - Research summaries and performance reports
-- **`Experiment Details/`** - Documentation, methodology, prompts, and Q&A
+## One-command local start
 
-# The Concept
-Every day, I kept seeing the same ad about having some A.I. pick undervalued stocks. It was obvious it was trying to get me to subscribe to some garbage, so I just rolled my eyes.  
-Then I started wondering, "How well would that actually work?"
+```bash
+docker compose up --build
+```
 
-So, starting with just $100, I wanted to answer a simple but powerful question:
+## Repo structure
 
-**Can powerful large language models like ChatGPT actually generate alpha (or at least make smart trading decisions) using real-time data?**
+- `apps/api` — NestJS API (Twilio webhook, lead intake, quote preview, reminders, analytics)
+- `apps/admin` — Next.js admin dashboard
+- `apps/worker` — queue worker scaffold
+- `packages/shared` — shared enums/constants
+- `packages/config` — env helpers
+- `packages/ui` — ui token stubs
+- `prisma` — schema and seed data
+- `tests` — quote/lead/reminder tests
+- `docs` — architecture/runbook/api spec
 
-## Each trading day:
+## Sandbox E2E demo
 
-- I provide it trading data on the stocks in its portfolio.  
-- Strict stop-loss rules apply.  
-- Every week I allow it to use deep research to reevaluate its account.  
-- I track and publish performance data weekly on my blog: [Here](https://nathanbsmith729.substack.com)
+1. Start stack: `docker compose up --build`
+2. Call webhook (mock call):
+```bash
+curl -X POST http://localhost:3001/webhooks/twilio/voice \
+  -H 'content-type: application/json' \
+  -d '{"CallSid":"CA123","From":"+15551230000","applianceType":"washer","symptom":"not_spinning","urgency":"high","lang":"ru","address":"101 Main St"}'
+```
+3. View leads: `curl http://localhost:3001/leads`
+4. View analytics: `curl http://localhost:3001/dashboard/summary`
 
-## Research & Documentation
+## Security/Reliability baseline in MVP
 
-- [Research Index](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/blob/main/Experiment%20Details/Deep%20Research%20Index.md)  
-- [Disclaimer](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/blob/main/Experiment%20Details/Disclaimer.md)  
-- [Q&A](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/blob/main/Experiment%20Details/Q%26A.md)  
-- [Prompts](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/blob/main/Experiment%20Details/Prompts.md)  
-- [Starting Your Own](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/blob/main/Start%20Your%20Own/README.md)  
-- [Research Summaries (MD)](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/tree/main/Weekly%20Deep%20Research%20(MD))  
-- [Full Deep Research Reports (PDF)](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/tree/main/Weekly%20Deep%20Research%20(PDF))
-- [Chats](https://github.com/LuckyOne7777/ChatGPT-Micro-Cap-Experiment/blob/main/Experiment%20Details/Chats.md)
-# Current Performance
+- Input normalization and DTO validation
+- Multi-tenant field in core entities
+- Webhook idempotency set for Twilio callback `CallSid`
+- Env-based secret management (`.env.example`)
+- Sandbox mode support (`SANDBOX_MODE=true`)
 
-<!-- To update performance chart: 
-     1. Replace the image file with updated results
-     2. Update the dates and description below
-     3. Update the "Last Updated" date -->
+## Next steps
 
-**Last Updated:** August 29th, 2025
-
-![Latest Performance Results](Results.png)
-
-**Current Status:** Portfolio is outperforming the S&P 500 benchmark
-
-*Performance data is updated after each trading day. See the CSV files in `Scripts and CSV Files/` for detailed daily tracking.*
-
-# Features of This Repo
-- Live trading scripts — used to evaluate prices and update holdings daily  
-- LLM-powered decision engine — ChatGPT picks the trades  
-- Performance tracking — CSVs with daily PnL, total equity, and trade history  
-- Visualization tools — Matplotlib graphs comparing ChatGPT vs. Index  
-- Logs & trade data — auto-saved logs for transparency  
-
-# Why This Matters
-AI is being hyped across every industry, but can it really manage money without guidance?
-
-This project is an attempt to find out — with transparency, data, and a real budget.
-
-# Tech Stack & Features
-
-## Core Technologies
-- **Python** - Core scripting and automation
-- **pandas + yFinance** - Market data fetching and analysis
-- **Matplotlib** - Performance visualization and charting
-- **ChatGPT-4** - AI-powered trading decision engine
-
-## Key Features
-- **Robust Data Sources** - Yahoo Finance primary, Stooq fallback for reliability
-- **Automated Stop-Loss** - Automatic position management with configurable stop-losses
-- **Interactive Trading** - Market-on-Open (MOO) and limit order support
-- **Backtesting Support** - ASOF_DATE override for historical analysis
-- **Performance Analytics** - CAPM analysis, Sharpe/Sortino ratios, drawdown metrics
-- **Trade Logging** - Complete transparency with detailed execution logs
-
-## System Requirements
-- Python 3.7+
-- Internet connection for market data
-- ~10MB storage for CSV data files
-
-# Follow Along
-The experiment runs from June 2025 to December 2025.  
-Every trading day I will update the portfolio CSV file.  
-If you feel inspired to do something similar, feel free to use this as a blueprint.
-
-Updates are posted weekly on my blog, more coming soon!
-
-Blog: [A.I Controls Stock Account](https://nathanbsmith729.substack.com)
-
-Have feature requests or any advice?  
-
-Please reach out here: **nathanbsmith.business@gmail.com**
+- Replace in-memory store with Prisma repositories.
+- Add JWT auth + RBAC guards.
+- Move reminders/dispatch to BullMQ queues + DLQ.
+- Add Twilio signature validation and rate-limiting middleware.

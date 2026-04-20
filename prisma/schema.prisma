@@ -1,0 +1,290 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LeadStatus { NEW QUALIFYING QUOTED BOOKED CLOSED LOST }
+enum CallStatus { RECEIVED IN_PROGRESS COMPLETED FAILED }
+enum AppointmentStatus { SCHEDULED CONFIRMED MISSED COMPLETED CANCELED }
+enum Urgency { LOW MEDIUM HIGH EMERGENCY UNKNOWN }
+enum Language { RU EN UNKNOWN }
+enum UserRole { OWNER DISPATCHER TECHNICIAN VIEWER }
+
+enum GenericStatus { ACTIVE INACTIVE ARCHIVED UNKNOWN }
+
+model Tenant {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  status    GenericStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+  customers Customer[]
+  leads     Lead[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  role         UserRole
+  status       GenericStatus @default(ACTIVE)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  technician   Technician?
+
+  @@unique([tenantId, email])
+}
+
+model Technician {
+  id        String @id @default(cuid())
+  tenantId  String
+  userId    String @unique
+  name      String
+  phone     String
+  status    GenericStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User   @relation(fields: [userId], references: [id])
+}
+
+model Customer {
+  id        String @id @default(cuid())
+  tenantId  String
+  phone     String
+  name      String?
+  email     String?
+  status    GenericStatus @default(ACTIVE)
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  leads     Lead[]
+
+  @@unique([tenantId, phone])
+}
+
+model Appliance {
+  id          String @id @default(cuid())
+  tenantId    String
+  customerId  String
+  type        String
+  brand       String?
+  model       String?
+  status      GenericStatus @default(ACTIVE)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Lead {
+  id             String @id @default(cuid())
+  tenantId       String
+  customerId     String
+  applianceType  String
+  brand          String?
+  model          String?
+  symptom        String
+  urgency        Urgency @default(UNKNOWN)
+  language       Language @default(UNKNOWN)
+  address        String?
+  qualityScore   Int @default(0)
+  status         LeadStatus @default(NEW)
+  sourceMetadata Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  tenant         Tenant @relation(fields: [tenantId], references: [id])
+  customer       Customer @relation(fields: [customerId], references: [id])
+  calls          Call[]
+  quotes         Quote[]
+  appointments   Appointment[]
+}
+
+model Call {
+  id              String @id @default(cuid())
+  tenantId        String
+  leadId          String
+  providerCallSid String @unique
+  fromPhone       String
+  toPhone         String
+  transcriptRaw   String?
+  normalizedFacts Json?
+  status          CallStatus @default(RECEIVED)
+  sourceMetadata  Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  lead            Lead @relation(fields: [leadId], references: [id])
+  turns           ConversationTurn[]
+}
+
+model ConversationTurn {
+  id        String @id @default(cuid())
+  callId    String
+  speaker   String
+  text      String
+  orderNo   Int
+  status    GenericStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SymptomReport {
+  id          String @id @default(cuid())
+  tenantId    String
+  leadId      String
+  category    String
+  normalized  String
+  severity    String
+  status      GenericStatus @default(ACTIVE)
+  sourceMetadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Quote {
+  id               String @id @default(cuid())
+  tenantId         String
+  leadId           String
+  lowEstimate      Int
+  highEstimate     Int
+  confidence       Float
+  assumptions      Json
+  recommendedAction String
+  status           GenericStatus @default(ACTIVE)
+  sourceMetadata   Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  lead             Lead @relation(fields: [leadId], references: [id])
+}
+
+model QuoteRule {
+  id            String @id @default(cuid())
+  tenantId      String
+  applianceType String
+  symptomCluster String
+  baseLow       Int
+  baseHigh      Int
+  confidence    Float
+  inspectionRequired Boolean @default(false)
+  status        GenericStatus @default(ACTIVE)
+  sourceMetadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PartPrice {
+  id          String @id @default(cuid())
+  tenantId    String
+  partName    String
+  applianceType String
+  price       Int
+  status      GenericStatus @default(ACTIVE)
+  sourceMetadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Appointment {
+  id            String @id @default(cuid())
+  tenantId      String
+  leadId        String
+  technicianId  String?
+  startsAt      DateTime
+  endsAt        DateTime
+  address       String
+  status        AppointmentStatus @default(SCHEDULED)
+  sourceMetadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lead         Lead @relation(fields: [leadId], references: [id])
+}
+
+model ReminderJob {
+  id            String @id @default(cuid())
+  tenantId      String
+  appointmentId String
+  kind          String
+  runAt         DateTime
+  status        GenericStatus @default(ACTIVE)
+  sourceMetadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DispatchEvent {
+  id          String @id @default(cuid())
+  tenantId    String
+  leadId      String
+  technicianId String?
+  eventType   String
+  payload     Json
+  status      GenericStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ReviewRequest {
+  id          String @id @default(cuid())
+  tenantId    String
+  leadId      String
+  channel     String
+  status      GenericStatus @default(ACTIVE)
+  sourceMetadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ReviewResponse {
+  id          String @id @default(cuid())
+  tenantId    String
+  reviewRequestId String
+  rating      Int?
+  comment     String?
+  status      GenericStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Integration {
+  id          String @id @default(cuid())
+  tenantId    String
+  type        String
+  config      Json
+  status      GenericStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditEvent {
+  id          String @id @default(cuid())
+  tenantId    String
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String
+  payload     Json?
+  status      GenericStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AnalyticsSnapshot {
+  id          String @id @default(cuid())
+  tenantId    String
+  date        DateTime
+  recoveredCalls Int @default(0)
+  quoteToBooking Float @default(0)
+  avgResponseSec Int @default(0)
+  noShowRate Float @default(0)
+  status      GenericStatus @default(ACTIVE)
+  sourceMetadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
